@@ -237,7 +237,7 @@ export default function App() {
       }
       setData(prev=>({...prev,[ch]:{rows,file:file.name,loaded:new Date().toLocaleTimeString()}}))
     }
-  },[])
+  })
 
   const handleFunnelPDF=async(file)=>{
     if(!file||!file.name.endsWith('.pdf')){alert('Please upload a PDF file');return}
