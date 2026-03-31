@@ -36,12 +36,7 @@ function CardHead({ children, color }) {
 function UploadZone({ channel, onFile, label, hint }) {
   const [over, setOver] = useState(false)
   return (
-    <div
-      onDragOver={e=>{e.preventDefault();setOver(true)}}
-      onDragLeave={()=>setOver(false)}
-      onDrop={e=>{e.preventDefault();setOver(false);const f=e.dataTransfer.files[0];if(f)onFile(f,channel)}}
-      style={{border:`2px dashed ${over?C.accent:'rgba(255,255,255,0.12)'}`,borderRadius:12,padding:'32px 24px',textAlign:'center',cursor:'pointer',position:'relative',background:over?'rgba(200,241,53,0.03)':'#0f0f12',marginBottom:14,transition:'all 0.2s'}}
-    >
+    <div onDragOver={e=>{e.preventDefault();setOver(true)}} onDragLeave={()=>setOver(false)} onDrop={e=>{e.preventDefault();setOver(false);const f=e.dataTransfer.files[0];if(f)onFile(f,channel)}} style={{border:`2px dashed ${over?C.accent:'rgba(255,255,255,0.12)'}`,borderRadius:12,padding:'32px 24px',textAlign:'center',cursor:'pointer',position:'relative',background:over?'rgba(200,241,53,0.03)':'#0f0f12',marginBottom:14,transition:'all 0.2s'}}>
       <input type="file" accept=".csv" onChange={e=>{if(e.target.files[0])onFile(e.target.files[0],channel)}} style={{position:'absolute',inset:0,opacity:0,cursor:'pointer',width:'100%',height:'100%'}} />
       <div style={{fontSize:28,marginBottom:10}}>📂</div>
       <div style={{fontSize:14,fontWeight:700,marginBottom:6}}>{label}</div>
@@ -117,7 +112,7 @@ function CampaignTable({ rows, channel }) {
           {sorted.map((r,i)=>{
             const cpa=(r.purchases||r.conversions)>0?(r.spend/(r.purchases||r.conversions)).toFixed(2):null
             const [sigLabel,sigColor]=getSignal(r.roas)
-            const [freqLabel,freqType]=getFreqBadge(r.frequency||0)
+            const [,freqType]=getFreqBadge(r.frequency||0)
             return (
               <tr key={i}>
                 <td style={{...td,...mono,fontSize:10}} title={r.name}>{r.name.length>34?r.name.slice(0,31)+'…':r.name}</td>
@@ -154,7 +149,6 @@ export default function App() {
   const chatRef=useRef(null)
   const msgInterval=useRef(null)
   const hasData=Object.values(data).some(v=>v)
-
   const MSGS=['Checking frequency thresholds…','Applying three-strikes kill rule…','Scoring campaign structure…','Evaluating creative fatigue…','Building scaling recommendations…','Generating new ad set proposals…','Calculating NMPDS action zones…']
 
   const processFile=useCallback((file,channel)=>{
@@ -174,11 +168,7 @@ export default function App() {
   },[])
 
   const callAPI=async(system,userContent,maxTokens=2200)=>{
-    const res=await fetch(`${API_URL}/api/analyze`,{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({system,messages:[{role:'user',content:userContent}],max_tokens:maxTokens})
-    })
+    const res=await fetch(`${API_URL}/api/analyze`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({system,messages:[{role:'user',content:userContent}],max_tokens:maxTokens})})
     if(!res.ok){const err=await res.json().catch(()=>({error:'Server error'}));throw new Error(err.error||`Error ${res.status}`)}
     const result=await res.json()
     return result.content?.[0]?.text||''
@@ -190,25 +180,19 @@ export default function App() {
     let mi=0;setLoadingMsg(MSGS[0])
     msgInterval.current=setInterval(()=>{mi++;setLoadingMsg(MSGS[mi%MSGS.length])},2200)
     try{
-      const summary=buildDataSummary(data,nmpds,roasOverall)
-      const txt=await callAPI(MEDIA_BUYER_SYSTEM,summary+'\n\nGenerate a full media buyer briefing.',2200)
-      const clean=txt.replace(/```json\n?|```\n?/g,'').trim()
-      setBriefing(JSON.parse(clean))
-    }catch(err){
-      setError('Analysis failed: '+err.message+'. Make sure your Railway backend is running and VITE_API_URL is set in Vercel.')
-    }
+      const txt=await callAPI(MEDIA_BUYER_SYSTEM,buildDataSummary(data,nmpds,roasOverall)+'\n\nGenerate a full media buyer briefing.',2200)
+      setBriefing(JSON.parse(txt.replace(/```json\n?|```\n?/g,'').trim()))
+    }catch(err){setError('Analysis failed: '+err.message+'. Check that VITE_API_URL is set in Vercel and your Railway backend is running.')}
     clearInterval(msgInterval.current);setLoading(false)
   }
 
   const runCreative=async()=>{
     if(!data.meta)return
     setCreativeLoading(true);setCreativeData(null)
-    const rows=data.meta.rows
-    const metaSum=rows.map(r=>`- "${r.name}": ROAS ${r.roas.toFixed(2)}x, Frequency ${r.frequency.toFixed(2)}, CPM $${r.cpm.toFixed(2)}, Spend $${r.spend.toFixed(0)}, Purchases ${r.purchases}`).join('\n')
+    const metaSum=data.meta.rows.map(r=>`- "${r.name}": ROAS ${r.roas.toFixed(2)}x, Freq ${r.frequency.toFixed(2)}, CPM $${r.cpm.toFixed(2)}, Spend $${r.spend.toFixed(0)}, Purchases ${r.purchases}`).join('\n')
     try{
-      const txt=await callAPI(CREATIVE_SYSTEM,`Meta campaign data:\n${metaSum}\n\nAnalyze creative fatigue and generate briefs for woodworking tools audience.`,1400)
-      const clean=txt.replace(/```json\n?|```\n?/g,'').trim()
-      setCreativeData(JSON.parse(clean))
+      const txt=await callAPI(CREATIVE_SYSTEM,`Meta data:\n${metaSum}\n\nAnalyze fatigue and generate briefs for woodworking tools audience.`,1400)
+      setCreativeData(JSON.parse(txt.replace(/```json\n?|```\n?/g,'').trim()))
     }catch(err){setError('Creative analysis failed: '+err.message)}
     setCreativeLoading(false)
   }
@@ -219,8 +203,7 @@ export default function App() {
     setChatHistory(prev=>[...prev,{role:'user',content:msg}])
     setChatLoading(true)
     try{
-      const context=`CAMPAIGN DATA:\n${buildDataSummary(data,nmpds,roasOverall)}\n\nBRIEFING:\n${briefing?.execSummary||'No briefing yet'}\n\nQUESTION: ${msg}`
-      const txt=await callAPI(CHAT_SYSTEM,context,700)
+      const txt=await callAPI(CHAT_SYSTEM,`DATA:\n${buildDataSummary(data,nmpds,roasOverall)}\n\nBRIEFING:\n${briefing?.execSummary||'None yet'}\n\nQUESTION: ${msg}`,700)
       setChatHistory(prev=>[...prev,{role:'assistant',content:txt}])
     }catch(err){setChatHistory(prev=>[...prev,{role:'assistant',content:'Error: '+err.message}])}
     setChatLoading(false)
@@ -235,6 +218,9 @@ export default function App() {
   const gradeColor=g=>({A:C.teal,B:'#639922',C:C.amber,D:C.coral,F:C.coral}[g]||'#555')
   const gradeLabel=g=>({A:'Excellent',B:'Good',C:'Needs work',D:'Issues present',F:'Urgent'}[g]||'')
   const tabs=[{id:'dashboard',label:'Dashboard'},{id:'analysis',label:'🧠 AI Media Buyer'},{id:'meta',label:'Meta'},{id:'google',label:'Google'},{id:'creative',label:'Creative'}]
+
+  const inputStyle={background:'#1a1a1f',border:'1px solid rgba(255,255,255,0.12)',borderRadius:6,padding:'5px 8px',color:'#e8e8ee',...mono,fontSize:12}
+  const bigBtn=(disabled)=>({width:'100%',padding:16,background:disabled?'#1a1a1f':C.accent,color:disabled?'#444':'#000',border:'none',borderRadius:10,fontFamily:'inherit',fontSize:14,fontWeight:800,cursor:disabled?'not-allowed':'pointer',marginBottom:16,display:'flex',alignItems:'center',justifyContent:'center',gap:10,transition:'all 0.15s'})
 
   return (
     <div style={{background:'#080809',minHeight:'100vh',color:'#e8e8ee',fontFamily:"'Epilogue', sans-serif"}}>
@@ -251,11 +237,7 @@ export default function App() {
       </div>
 
       <div style={{display:'flex',borderBottom:'1px solid rgba(255,255,255,0.07)',background:'#0f0f12',padding:'0 24px',overflowX:'auto'}}>
-        {tabs.map(t=>(
-          <div key={t.id} onClick={()=>setTab(t.id)} style={{padding:'11px 16px',fontSize:12,fontWeight:600,color:tab===t.id?'#e8e8ee':'#555560',cursor:'pointer',borderBottom:tab===t.id?`2px solid ${C.accent}`:'2px solid transparent',whiteSpace:'nowrap',transition:'all 0.15s'}}>
-            {t.label}
-          </div>
-        ))}
+        {tabs.map(t=><div key={t.id} onClick={()=>setTab(t.id)} style={{padding:'11px 16px',fontSize:12,fontWeight:600,color:tab===t.id?'#e8e8ee':'#555560',cursor:'pointer',borderBottom:tab===t.id?`2px solid ${C.accent}`:'2px solid transparent',whiteSpace:'nowrap',transition:'all 0.15s'}}>{t.label}</div>)}
       </div>
 
       <div style={{padding:'20px 24px',maxWidth:1200}}>
@@ -264,13 +246,9 @@ export default function App() {
         {tab==='dashboard'&&(
           <div>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:20,flexWrap:'wrap',gap:12}}>
-              <div>
-                <div style={{fontSize:20,fontWeight:800,letterSpacing:'-0.02em'}}>Dashboard</div>
-                <div style={{...mono,fontSize:10,color:'#555560',marginTop:3}}>Funnel.io · Last 30 days · 7-day lookback</div>
-              </div>
+              <div><div style={{fontSize:20,fontWeight:800,letterSpacing:'-0.02em'}}>Dashboard</div><div style={{...mono,fontSize:10,color:'#555560',marginTop:3}}>Funnel.io · Last 30 days · 7-day lookback</div></div>
               {!hasData&&<button onClick={()=>setTab('meta')} style={{fontFamily:'inherit',fontSize:13,fontWeight:700,padding:'9px 18px',borderRadius:8,border:'none',cursor:'pointer',background:C.accent,color:'#000'}}>+ Import CSV</button>}
             </div>
-
             <Card style={{borderColor:'rgba(200,241,53,0.15)',background:'#0f0f12'}}>
               <CardHead color={C.accent}>Funnel.io actuals — update from your dashboard</CardHead>
               <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,marginBottom:14}}>
@@ -280,18 +258,11 @@ export default function App() {
                 <MetricCard label="Total sales" value="$318K" sub="7-day attribution"/>
               </div>
               <div style={{display:'flex',gap:12,alignItems:'center',flexWrap:'wrap'}}>
-                <span style={{...mono,fontSize:11,color:'#666'}}>Update numbers:</span>
-                <div style={{display:'flex',alignItems:'center',gap:6}}>
-                  <span style={{...mono,fontSize:11,color:'#888'}}>NMPDS $</span>
-                  <input value={nmpds} onChange={e=>setNmpds(e.target.value)} style={{width:70,background:'#1a1a1f',border:'1px solid rgba(255,255,255,0.12)',borderRadius:6,padding:'5px 8px',color:'#e8e8ee',...mono,fontSize:12}}/>
-                </div>
-                <div style={{display:'flex',alignItems:'center',gap:6}}>
-                  <span style={{...mono,fontSize:11,color:'#888'}}>ROAS</span>
-                  <input value={roasOverall} onChange={e=>setRoasOverall(e.target.value)} style={{width:60,background:'#1a1a1f',border:'1px solid rgba(255,255,255,0.12)',borderRadius:6,padding:'5px 8px',color:'#e8e8ee',...mono,fontSize:12}}/>
-                </div>
+                <span style={{...mono,fontSize:11,color:'#666'}}>Update:</span>
+                <div style={{display:'flex',alignItems:'center',gap:6}}><span style={{...mono,fontSize:11,color:'#888'}}>NMPDS $</span><input value={nmpds} onChange={e=>setNmpds(e.target.value)} style={{...inputStyle,width:70}}/></div>
+                <div style={{display:'flex',alignItems:'center',gap:6}}><span style={{...mono,fontSize:11,color:'#888'}}>ROAS</span><input value={roasOverall} onChange={e=>setRoasOverall(e.target.value)} style={{...inputStyle,width:60}}/></div>
               </div>
             </Card>
-
             {!hasData?(
               <div style={{textAlign:'center',padding:'52px 20px'}}>
                 <div style={{fontSize:32,marginBottom:12,opacity:0.4}}>⚡</div>
@@ -302,23 +273,15 @@ export default function App() {
             ):(
               <div>
                 <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,marginBottom:14}}>
-                  <MetricCard label="CSV total spend" value={'$'+totalSpend.toLocaleString('en-US',{maximumFractionDigits:0})} sub="Loaded channels"/>
+                  <MetricCard label="Total spend" value={'$'+totalSpend.toLocaleString('en-US',{maximumFractionDigits:0})} sub="Loaded channels"/>
                   <MetricCard label="Conversions" value={totalConv.toLocaleString()} sub="Platform data"/>
                   <MetricCard label="Platform ROAS" value={blendedRoas.toFixed(2)+'×'} sub="CSV blended" color={blendedRoas>=6.5?C.teal:blendedRoas>=5?C.amber:C.coral}/>
                   <MetricCard label="Campaigns" value={primaryRows.length} sub={Object.entries(data).filter(([,v])=>v).map(([k])=>k).join(' · ')}/>
                 </div>
-                <Card>
-                  <CardHead>Campaigns</CardHead>
-                  <CampaignTable rows={primaryRows} channel={data.meta?'meta':'google'}/>
-                </Card>
+                <Card><CardHead>Campaigns</CardHead><CampaignTable rows={primaryRows} channel={data.meta?'meta':'google'}/></Card>
                 <div style={{background:'linear-gradient(135deg,rgba(200,241,53,0.07),rgba(139,111,255,0.07))',border:'1px solid rgba(200,241,53,0.18)',borderRadius:12,padding:'20px 24px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:16,flexWrap:'wrap'}}>
-                  <div>
-                    <div style={{fontSize:15,fontWeight:800,marginBottom:4}}>Run your AI Media Buyer briefing</div>
-                    <div style={{...mono,fontSize:11,color:'#666'}}>190 checks · 2026 frameworks · 5× break-even anchor</div>
-                  </div>
-                  <button onClick={()=>{setTab('analysis');setTimeout(runBriefing,100)}} style={{fontFamily:'inherit',fontSize:13,fontWeight:700,padding:'10px 24px',borderRadius:8,border:'none',cursor:'pointer',background:C.accent,color:'#000'}}>
-                    Generate Briefing ↗
-                  </button>
+                  <div><div style={{fontSize:15,fontWeight:800,marginBottom:4}}>Run your AI Media Buyer briefing</div><div style={{...mono,fontSize:11,color:'#666'}}>190 checks · 2026 frameworks · 5× break-even</div></div>
+                  <button onClick={()=>{setTab('analysis');setTimeout(runBriefing,100)}} style={{fontFamily:'inherit',fontSize:13,fontWeight:700,padding:'10px 24px',borderRadius:8,border:'none',cursor:'pointer',background:C.accent,color:'#000'}}>Generate Briefing ↗</button>
                 </div>
               </div>
             )}
@@ -329,19 +292,10 @@ export default function App() {
           <div>
             <div style={{fontSize:20,fontWeight:800,marginBottom:4}}>AI Media Buyer</div>
             <div style={{...mono,fontSize:10,color:'#555560',marginBottom:20}}>2026 frameworks · 190 checks · NMPDS-anchored · 5× break-even</div>
-
-            <button disabled={!hasData||loading} onClick={runBriefing} style={{width:'100%',padding:16,background:!hasData||loading?'#1a1a1f':C.accent,color:!hasData||loading?'#444':'#000',border:'none',borderRadius:10,fontFamily:'inherit',fontSize:14,fontWeight:800,cursor:!hasData||loading?'not-allowed':'pointer',marginBottom:16,display:'flex',alignItems:'center',justifyContent:'center',gap:10,transition:'all 0.15s'}}>
+            <button disabled={!hasData||loading} onClick={runBriefing} style={bigBtn(!hasData||loading)}>
               {loading?<><Spinner color={C.accent}/><span style={{color:C.accent}}>{loadingMsg}</span></>:briefing?'🔄  Re-run Briefing':hasData?'🧠  Generate Briefing':'Load data first on the Meta tab'}
             </button>
-
-            {!briefing&&!loading&&(
-              <div style={{textAlign:'center',padding:'40px 20px',color:'#555560'}}>
-                <div style={{fontSize:32,marginBottom:12,opacity:0.4}}>🧠</div>
-                <div style={{fontSize:14,fontWeight:700,color:'#e8e8ee',marginBottom:8}}>Senior media buyer on standby</div>
-                <div style={{...mono,fontSize:11,lineHeight:1.8}}>Import CSV on the Meta or Google tab, then hit the button above.</div>
-              </div>
-            )}
-
+            {!briefing&&!loading&&<div style={{textAlign:'center',padding:'40px 20px',color:'#555560'}}><div style={{fontSize:32,marginBottom:12,opacity:0.4}}>🧠</div><div style={{fontSize:14,fontWeight:700,color:'#e8e8ee',marginBottom:8}}>Senior media buyer on standby</div><div style={{...mono,fontSize:11,lineHeight:1.8}}>Import CSV on the Meta or Google tab, then hit the button above.</div></div>}
             {briefing&&(
               <div>
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14,marginBottom:14}}>
@@ -350,87 +304,44 @@ export default function App() {
                     <div style={{textAlign:'center',padding:'16px 0'}}>
                       <div style={{fontSize:52,fontWeight:900,letterSpacing:'-0.04em',color:gradeColor(briefing.healthGrade)}}>{briefing.healthScore}</div>
                       <div style={{...mono,fontSize:12,color:'#666',marginTop:4}}>Grade {briefing.healthGrade} — {gradeLabel(briefing.healthGrade)}</div>
-                      <div style={{height:6,background:'#1e1e22',borderRadius:3,overflow:'hidden',marginTop:12}}>
-                        <div style={{height:'100%',width:`${briefing.healthScore}%`,background:gradeColor(briefing.healthGrade),borderRadius:3,transition:'width 1s ease'}}/>
-                      </div>
+                      <div style={{height:6,background:'#1e1e22',borderRadius:3,overflow:'hidden',marginTop:12}}><div style={{height:'100%',width:`${briefing.healthScore}%`,background:gradeColor(briefing.healthGrade),borderRadius:3,transition:'width 1s ease'}}/></div>
                     </div>
                   </Card>
                   <Card>
                     <CardHead>Dimension scores</CardHead>
-                    {briefing.dimensionScores&&[['Campaign Structure','campaignStructure',20],['Creative Quality','creativeQuality',25],['Audience & Targeting','audienceTargeting',20],['Bidding & Budget','biddingBudget',15],['Tracking','tracking',10],['Account Hygiene','accountHygiene',10]].map(([l,k,m])=>(
-                      <ScoreBar key={k} label={l} value={briefing.dimensionScores[k]||0} max={m}/>
-                    ))}
+                    {briefing.dimensionScores&&[['Campaign Structure','campaignStructure',20],['Creative Quality','creativeQuality',25],['Audience & Targeting','audienceTargeting',20],['Bidding & Budget','biddingBudget',15],['Tracking','tracking',10],['Account Hygiene','accountHygiene',10]].map(([l,k,m])=><ScoreBar key={k} label={l} value={briefing.dimensionScores[k]||0} max={m}/>)}
                   </Card>
                 </div>
-
-                <Card>
-                  <CardHead>Executive brief</CardHead>
-                  <div style={{...mono,fontSize:11,color:'#9898a8',lineHeight:1.8}}>{briefing.execSummary}</div>
-                </Card>
-
-                <Card>
-                  <CardHead>Recommendations</CardHead>
-                  {(briefing.recommendations||[]).map((r,i)=><InsightRec key={i} rec={r}/>)}
-                </Card>
-
+                <Card><CardHead>Executive brief</CardHead><div style={{...mono,fontSize:11,color:'#9898a8',lineHeight:1.8}}>{briefing.execSummary}</div></Card>
+                <Card><CardHead>Recommendations</CardHead>{(briefing.recommendations||[]).map((r,i)=><InsightRec key={i} rec={r}/>)}</Card>
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:14,marginBottom:14}}>
-                  <Card>
-                    <CardHead color={C.teal}>Scale these ↑</CardHead>
-                    {(briefing.scale||[]).length?briefing.scale.map((i,idx)=><ListItem key={idx} item={i} color={C.teal}/>):<div style={{...mono,fontSize:10,color:'#444'}}>None flagged</div>}
-                  </Card>
-                  <Card>
-                    <CardHead color={C.coral}>Pause or fix ✕</CardHead>
-                    {(briefing.pause||[]).length?briefing.pause.map((i,idx)=><ListItem key={idx} item={i} color={C.coral}/>):<div style={{...mono,fontSize:10,color:'#444'}}>None flagged</div>}
-                  </Card>
-                  <Card>
-                    <CardHead color={C.amber}>New ad sets to test</CardHead>
-                    {(briefing.newAdSets||[]).length?briefing.newAdSets.map((i,idx)=><ListItem key={idx} item={i} color={C.amber}/>):<div style={{...mono,fontSize:10,color:'#444'}}>None suggested</div>}
-                  </Card>
+                  <Card><CardHead color={C.teal}>Scale these ↑</CardHead>{(briefing.scale||[]).length?briefing.scale.map((i,idx)=><ListItem key={idx} item={i} color={C.teal}/>):<div style={{...mono,fontSize:10,color:'#444'}}>None flagged</div>}</Card>
+                  <Card><CardHead color={C.coral}>Pause or fix ✕</CardHead>{(briefing.pause||[]).length?briefing.pause.map((i,idx)=><ListItem key={idx} item={i} color={C.coral}/>):<div style={{...mono,fontSize:10,color:'#444'}}>None flagged</div>}</Card>
+                  <Card><CardHead color={C.amber}>New ad sets to test</CardHead>{(briefing.newAdSets||[]).length?briefing.newAdSets.map((i,idx)=><ListItem key={idx} item={i} color={C.amber}/>):<div style={{...mono,fontSize:10,color:'#444'}}>None suggested</div>}</Card>
                 </div>
-
                 <Card>
                   <CardHead>Creative recommendations</CardHead>
                   {(briefing.creativeRecs||[]).map((r,i)=>(
                     <div key={i} style={{display:'flex',gap:12,padding:'14px 0',borderBottom:'1px solid rgba(255,255,255,0.06)'}}>
                       <div style={{width:3,borderRadius:2,background:C.amber,flexShrink:0,minHeight:36,alignSelf:'stretch'}}/>
-                      <div>
-                        <div style={{fontSize:12,fontWeight:700,marginBottom:4,display:'flex',gap:8,alignItems:'center'}}>
-                          {r.title} <Badge type="w">{r.type}</Badge>
-                        </div>
-                        <div style={{...mono,fontSize:11,color:'#9898a8',lineHeight:1.7}}>{r.detail}</div>
-                      </div>
+                      <div><div style={{fontSize:12,fontWeight:700,marginBottom:4,display:'flex',gap:8,alignItems:'center'}}>{r.title} <Badge type="w">{r.type}</Badge></div><div style={{...mono,fontSize:11,color:'#9898a8',lineHeight:1.7}}>{r.detail}</div></div>
                     </div>
                   ))}
                 </Card>
-
                 <Card>
                   <CardHead>Budget moves</CardHead>
                   {(briefing.budgetMoves||[]).map((m,i)=>(
                     <div key={i} style={{display:'flex',gap:10,padding:'9px 0',borderBottom:'1px solid rgba(255,255,255,0.06)'}}>
                       <div style={{width:3,borderRadius:2,background:C.violet,flexShrink:0,minHeight:28,alignSelf:'stretch'}}/>
-                      <div>
-                        <div style={{fontSize:11,fontWeight:700,marginBottom:2}}>{m.amount} — {m.from} → {m.to}</div>
-                        <div style={{...mono,fontSize:10,color:'#9898a8'}}>{m.reason}</div>
-                      </div>
+                      <div><div style={{fontSize:11,fontWeight:700,marginBottom:2}}>{m.amount} — {m.from} → {m.to}</div><div style={{...mono,fontSize:10,color:'#9898a8'}}>{m.reason}</div></div>
                     </div>
                   ))}
-                  {briefing.positives?.length>0&&(
-                    <div style={{marginTop:16}}>
-                      <CardHead>What's working</CardHead>
-                      {briefing.positives.map((p,i)=>(
-                        <div key={i} style={{display:'flex',gap:10,padding:'9px 0',borderBottom:'1px solid rgba(255,255,255,0.06)'}}>
-                          <div style={{width:3,borderRadius:2,background:C.teal,flexShrink:0,minHeight:28,alignSelf:'stretch'}}/>
-                          <div style={{...mono,fontSize:11,color:'#9898a8'}}>{p}</div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                  {briefing.positives?.length>0&&<div style={{marginTop:16}}><CardHead>What's working</CardHead>{briefing.positives.map((p,i)=><div key={i} style={{display:'flex',gap:10,padding:'9px 0',borderBottom:'1px solid rgba(255,255,255,0.06)'}}><div style={{width:3,borderRadius:2,background:C.teal,flexShrink:0,minHeight:28,alignSelf:'stretch'}}/><div style={{...mono,fontSize:11,color:'#9898a8'}}>{p}</div></div>)}</div>}
                 </Card>
-
                 <Card>
                   <CardHead>Ask your media buyer</CardHead>
                   <div ref={chatRef} style={{maxHeight:300,overflowY:'auto',marginBottom:12}}>
-                    {chatHistory.length===0&&<div style={{...mono,fontSize:11,color:'#444',padding:'8px 0'}}>Ask anything — scaling decisions, creative strategy, budget allocation…</div>}
+                    {chatHistory.length===0&&<div style={{...mono,fontSize:11,color:'#444',padding:'8px 0'}}>Ask anything — scaling, creative strategy, budget decisions…</div>}
                     {chatHistory.map((m,i)=>(
                       <div key={i} style={{marginBottom:14}}>
                         <div style={{...mono,fontSize:9,color:m.role==='user'?'#555560':C.accent,marginBottom:4,textTransform:'uppercase',letterSpacing:'0.1em'}}>{m.role==='user'?'You':'Media Buyer'}</div>
@@ -451,22 +362,18 @@ export default function App() {
 
         {tab==='meta'&&(
           <div>
-            <div style={{fontSize:20,fontWeight:800,marginBottom:4,display:'flex',alignItems:'center',gap:10}}>
-              <span style={{width:10,height:10,borderRadius:'50%',background:C.meta,display:'inline-block'}}/>Meta · Facebook / Instagram
-            </div>
-            <div style={{...mono,fontSize:10,color:'#555560',marginBottom:20}}>Ads Manager → Campaigns → Export CSV</div>
-            <UploadZone channel="meta" onFile={processFile} label="Drop Meta Ads campaign CSV" hint="Include: Amount spent, Purchases, ROAS, CPM, Frequency, Reach"/>
+            <div style={{fontSize:20,fontWeight:800,marginBottom:4,display:'flex',alignItems:'center',gap:10}}><span style={{width:10,height:10,borderRadius:'50%',background:C.meta,display:'inline-block'}}/>Meta · Facebook / Instagram</div>
+            <div style={{...mono,fontSize:10,color:'#555560',marginBottom:20}}>Ads Manager → Campaigns → Export CSV · Include: Amount spent, Purchases, ROAS, CPM, Frequency, Reach</div>
+            <UploadZone channel="meta" onFile={processFile} label="Drop Meta Ads campaign CSV" hint="Ads Manager → Campaigns → set date range → Export"/>
             {data.meta&&<Card><CardHead>{data.meta.file} · {data.meta.rows.length} campaigns</CardHead><CampaignTable rows={data.meta.rows} channel="meta"/></Card>}
           </div>
         )}
 
         {tab==='google'&&(
           <div>
-            <div style={{fontSize:20,fontWeight:800,marginBottom:4,display:'flex',alignItems:'center',gap:10}}>
-              <span style={{width:10,height:10,borderRadius:'50%',background:C.google,display:'inline-block'}}/>Google Ads
-            </div>
-            <div style={{...mono,fontSize:10,color:'#555560',marginBottom:20}}>Google Ads → Campaigns → Download CSV</div>
-            <UploadZone channel="google" onFile={processFile} label="Drop Google Ads campaign CSV" hint="Include: Cost, Conversions, Conv. value, Clicks, CTR"/>
+            <div style={{fontSize:20,fontWeight:800,marginBottom:4,display:'flex',alignItems:'center',gap:10}}><span style={{width:10,height:10,borderRadius:'50%',background:C.google,display:'inline-block'}}/>Google Ads</div>
+            <div style={{...mono,fontSize:10,color:'#555560',marginBottom:20}}>Google Ads → Campaigns → Download CSV · Include: Cost, Conversions, Conv. value, Clicks, CTR</div>
+            <UploadZone channel="google" onFile={processFile} label="Drop Google Ads campaign CSV" hint="Campaigns tab → Download → CSV"/>
             {data.google&&<Card><CardHead>{data.google.file} · {data.google.rows.length} campaigns</CardHead><CampaignTable rows={data.google.rows} channel="google"/></Card>}
           </div>
         )}
@@ -474,13 +381,8 @@ export default function App() {
         {tab==='creative'&&(
           <div>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:20,flexWrap:'wrap',gap:12}}>
-              <div>
-                <div style={{fontSize:20,fontWeight:800}}>Creative Analysis</div>
-                <div style={{...mono,fontSize:10,color:'#555560',marginTop:3}}>Fatigue signals · Hook angles · Production briefs</div>
-              </div>
-              <button disabled={!data.meta||creativeLoading} onClick={runCreative} style={{fontFamily:'inherit',fontSize:13,fontWeight:700,padding:'9px 18px',borderRadius:8,border:'none',cursor:!data.meta||creativeLoading?'not-allowed':'pointer',background:!data.meta||creativeLoading?'#1a1a1f':C.accent,color:!data.meta||creativeLoading?'#444':'#000'}}>
-                {creativeLoading?'Analyzing…':'Analyze Creatives'}
-              </button>
+              <div><div style={{fontSize:20,fontWeight:800}}>Creative Analysis</div><div style={{...mono,fontSize:10,color:'#555560',marginTop:3}}>Fatigue signals · Hook angles · Production briefs</div></div>
+              <button disabled={!data.meta||creativeLoading} onClick={runCreative} style={{fontFamily:'inherit',fontSize:13,fontWeight:700,padding:'9px 18px',borderRadius:8,border:'none',cursor:!data.meta||creativeLoading?'not-allowed':'pointer',background:!data.meta||creativeLoading?'#1a1a1f':C.accent,color:!data.meta||creativeLoading?'#444':'#000'}}>{creativeLoading?'Analyzing…':'Analyze Creatives'}</button>
             </div>
             {!data.meta&&<div style={{textAlign:'center',padding:'40px 20px',color:'#555560'}}><div style={{fontSize:32,marginBottom:12,opacity:0.4}}>🎨</div><div style={{fontSize:14,fontWeight:700,color:'#e8e8ee',marginBottom:8}}>Load Meta data first</div></div>}
             {creativeLoading&&<div style={{display:'flex',gap:10,alignItems:'center',...mono,fontSize:12,color:C.accent,padding:'16px 0'}}><Spinner color={C.accent}/>Analyzing…</div>}
@@ -491,32 +393,13 @@ export default function App() {
                   {(creativeData.fatigueAssessment||[]).map((f,i)=>{
                     const c=f.status==='OK'?C.teal:f.status==='Watch'?C.amber:C.coral
                     const bt=f.status==='OK'?'g':f.status==='Watch'?'w':'r'
-                    return(
-                      <div key={i} style={{display:'flex',gap:12,padding:'14px 0',borderBottom:'1px solid rgba(255,255,255,0.06)'}}>
-                        <div style={{width:3,borderRadius:2,background:c,flexShrink:0,minHeight:36,alignSelf:'stretch'}}/>
-                        <div style={{flex:1}}>
-                          <div style={{fontSize:12,fontWeight:700,marginBottom:4,display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
-                            {f.campaign.length>40?f.campaign.slice(0,37)+'…':f.campaign}
-                            <Badge type={bt}>{f.status}</Badge>
-                            <span style={{...mono,fontSize:10,color:'#555560'}}>freq {f.frequency}</span>
-                          </div>
-                          <div style={{...mono,fontSize:10,color:C.accent}}>→ {f.action}</div>
-                        </div>
-                      </div>
-                    )
+                    return(<div key={i} style={{display:'flex',gap:12,padding:'14px 0',borderBottom:'1px solid rgba(255,255,255,0.06)'}}><div style={{width:3,borderRadius:2,background:c,flexShrink:0,minHeight:36,alignSelf:'stretch'}}/><div style={{flex:1}}><div style={{fontSize:12,fontWeight:700,marginBottom:4,display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>{f.campaign.length>40?f.campaign.slice(0,37)+'…':f.campaign}<Badge type={bt}>{f.status}</Badge><span style={{...mono,fontSize:10,color:'#555560'}}>freq {f.frequency}</span></div><div style={{...mono,fontSize:10,color:C.accent}}>→ {f.action}</div></div></div>)
                   })}
                 </Card>
                 <Card>
                   <CardHead>Hook angles to test</CardHead>
                   {(creativeData.hookAngles||[]).map((h,i)=>(
-                    <div key={i} style={{display:'flex',gap:12,padding:'14px 0',borderBottom:'1px solid rgba(255,255,255,0.06)'}}>
-                      <div style={{width:3,borderRadius:2,background:C.accent,flexShrink:0,minHeight:36,alignSelf:'stretch'}}/>
-                      <div>
-                        <div style={{fontSize:12,fontWeight:700,marginBottom:6}}>{h.angle}</div>
-                        <div style={{...mono,fontSize:12,color:C.accent,background:'#161619',padding:'6px 10px',borderRadius:5,marginBottom:6}}>"{h.hook}"</div>
-                        <div style={{...mono,fontSize:11,color:'#9898a8',lineHeight:1.7}}>{h.why}</div>
-                      </div>
-                    </div>
+                    <div key={i} style={{display:'flex',gap:12,padding:'14px 0',borderBottom:'1px solid rgba(255,255,255,0.06)'}}><div style={{width:3,borderRadius:2,background:C.accent,flexShrink:0,minHeight:36,alignSelf:'stretch'}}/><div><div style={{fontSize:12,fontWeight:700,marginBottom:6}}>{h.angle}</div><div style={{...mono,fontSize:12,color:C.accent,background:'#161619',padding:'6px 10px',borderRadius:5,marginBottom:6}}>"{h.hook}"</div><div style={{...mono,fontSize:11,color:'#9898a8',lineHeight:1.7}}>{h.why}</div></div></div>
                   ))}
                 </Card>
                 <Card>
