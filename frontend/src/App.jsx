@@ -222,23 +222,30 @@ export default function App() {
   const MSGS=['Checking frequency thresholds…','Applying three-strikes kill rule…','Scoring account structure…','Evaluating creative fatigue signals…','Building your action plan…','Running 190-point audit…','Finalising checklist…']
   const inputStyle={background:'#1a1a1f',border:'1px solid rgba(255,255,255,0.12)',borderRadius:6,padding:'5px 8px',color:'#e8e8ee',...mono,fontSize:12,outline:'none'}
 
-  const processFile=useCallback((file,channel)=>{
-    if(!file||!file.name.endsWith('.csv')){alert('Please upload a .csv file');return}
+  const processFile=(file,channel)=>{
+    console.log('processFile called', file?.name, channel)
+    if(!file){alert('No file');return}
+    if(!file.name.toLowerCase().endsWith('.csv')){alert('Please upload a .csv file');return}
     const reader=new FileReader()
+    reader.onerror=()=>alert('Read error')
     reader.onload=e=>{
-      const raw=parseCSV(e.target.result)
-      if(!raw.length){alert('No data found in CSV');return}
-      const hdrs=Object.keys(raw[0])
-      const ch=channel==='auto'?detectChannel(hdrs):channel
-      const rows=ch==='meta'?normalizeMeta(raw):normalizeGoogle(raw)
-      if(!rows.length){
-        alert(`No campaigns with spend found.\n\nColumns detected: ${hdrs.slice(0,6).join(', ')}\n\nFor Google Ads: confirm the column is named "Cost" and remove any summary rows at the top.`)
-        return
-      }
-      setData(prev=>({...prev,[ch]:{rows,file:file.name,loaded:new Date().toLocaleTimeString()}}))
+      try{
+        const raw=parseCSV(e.target.result)
+        console.log('rows parsed:', raw.length)
+        if(!raw.length){alert('CSV empty');return}
+        const hdrs=Object.keys(raw[0])
+        console.log('headers:', hdrs.slice(0,5).join(', '))
+        const ch=channel==='auto'?detectChannel(hdrs):channel
+        console.log('channel:', ch)
+        const rows=ch==='meta'?normalizeMeta(raw):normalizeGoogle(raw)
+        console.log('campaigns with spend:', rows.length)
+        if(!rows.length){alert('No campaigns with spend found. Columns: '+hdrs.slice(0,5).join(', '));return}
+        setData(prev=>({...prev,[ch]:{rows,file:file.name,loaded:new Date().toLocaleTimeString()}}))
+        console.log('setData called successfully')
+      }catch(err){alert('Error: '+err.message);console.error(err)}
     }
-  })
-
+    reader.readAsText(file)
+  }
   const handleFunnelPDF=async(file)=>{
     if(!file||!file.name.endsWith('.pdf')){alert('Please upload a PDF file');return}
     setPdfLoading(true);setError('')
