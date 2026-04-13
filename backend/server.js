@@ -17,7 +17,7 @@ app.post('/api/analyze', async (req, res) => {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured' });
 
-  const { system, messages, max_tokens = 4000 } = req.body;
+  const { system, messages, max_tokens = 8000 } = req.body;
   if (!messages || !system) return res.status(400).json({ error: 'Missing system or messages' });
 
   try {

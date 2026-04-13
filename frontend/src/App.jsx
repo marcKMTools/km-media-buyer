@@ -298,7 +298,7 @@ export default function App() {
     return s
   }
 
-  const callAPI=async(system,messages,maxTokens=2200)=>{
+  const callAPI=async(system,messages,maxTokens=3500)=>{
     const res=await fetch(`${API_URL}/api/analyze`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({system,messages,max_tokens:maxTokens})})
     if(!res.ok){const err=await res.json().catch(()=>({error:'Server error'}));throw new Error(err.error||`Error ${res.status}`)}
     const result=await res.json()
@@ -386,7 +386,7 @@ Return ONLY valid JSON:
     msgInterval.current=setInterval(()=>{mi++;setLoadingMsg(MSGS[mi%MSGS.length])},2200)
     try{
       const summary=(hasData?buildDataSummary(data,nmpds,roasOverall):'')+'\n\n'+buildFunnelSummary()
-      const txt=await callAPI(MEDIA_BUYER_SYSTEM,[{role:'user',content:summary+'\n\nGenerate a full media buyer briefing.'}],2200)
+      const txt=await callAPI(MEDIA_BUYER_SYSTEM,[{role:'user',content:summary+'\n\nGenerate a full media buyer briefing.'}],3500)
       setBriefing(JSON.parse(repairJSON(txt)))
     }catch(err){setError('Analysis failed: '+err.message)}
     clearInterval(msgInterval.current);setLoading(false)
