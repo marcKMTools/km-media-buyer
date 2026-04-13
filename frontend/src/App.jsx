@@ -372,7 +372,7 @@ Return ONLY valid JSON:
     msgInterval.current=setInterval(()=>{mi++;setLoadingMsg(MSGS[mi%MSGS.length])},1800)
     try{
       const summary=(hasData?buildDataSummary(data,nmpds,roasOverall):'')+'\n\n'+buildFunnelSummary()
-      const txt=await callAPI(CHECKLIST_SYSTEM,[{role:'user',content:summary+'\n\nGenerate my weekly action checklist.'}],2000)
+      const txt=await callAPI(CHECKLIST_SYSTEM,[{role:'user',content:summary+'\n\nGenerate my weekly action checklist.'}],3000)
       setChecklist(JSON.parse(repairJSON(txt)))
     }catch(err){setError('Checklist failed: '+err.message)}
     clearInterval(msgInterval.current);setChecklistLoading(false)
