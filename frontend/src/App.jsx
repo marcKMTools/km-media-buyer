@@ -348,6 +348,23 @@ Return ONLY valid JSON:
   "watchOut": "The one risk that could hurt performance this week if ignored"
 }`
 
+
+  const repairJSON = (txt) => {
+    // Strip markdown fences
+    let s = txt.replace(/```json\n?|```\n?/g, '').trim()
+    // If truncated, try to close open structures
+    if (!s.endsWith('}')) {
+      // Close any open arrays
+      const openArrays = (s.match(/\[/g)||[]).length - (s.match(/\]/g)||[]).length
+      const openObjects = (s.match(/\{/g)||[]).length - (s.match(/\}/g)||[]).length
+      // Remove trailing comma or incomplete field
+      s = s.replace(/,\s*$/, '').replace(/,\s*"[^"]*"\s*:\s*[^,}\]]*$/, '')
+      for (let i = 0; i < openArrays; i++) s += ']'
+      for (let i = 0; i < openObjects; i++) s += '}'
+    }
+    return s
+  }
+
   const runChecklist=async()=>{
     if(!hasAnyData)return
     setChecklistLoading(true);setError('');setChecklist(null)
@@ -355,8 +372,8 @@ Return ONLY valid JSON:
     msgInterval.current=setInterval(()=>{mi++;setLoadingMsg(MSGS[mi%MSGS.length])},1800)
     try{
       const summary=(hasData?buildDataSummary(data,nmpds,roasOverall):'')+'\n\n'+buildFunnelSummary()
-      const txt=await callAPI(CHECKLIST_SYSTEM,[{role:'user',content:summary+'\n\nGenerate my weekly action checklist.'}],1400)
-      setChecklist(JSON.parse(txt.replace(/```json\n?|```\n?/g,'').trim()))
+      const txt=await callAPI(CHECKLIST_SYSTEM,[{role:'user',content:summary+'\n\nGenerate my weekly action checklist.'}],2000)
+      setChecklist(JSON.parse(repairJSON(txt)))
     }catch(err){setError('Checklist failed: '+err.message)}
     clearInterval(msgInterval.current);setChecklistLoading(false)
   }
@@ -370,7 +387,7 @@ Return ONLY valid JSON:
     try{
       const summary=(hasData?buildDataSummary(data,nmpds,roasOverall):'')+'\n\n'+buildFunnelSummary()
       const txt=await callAPI(MEDIA_BUYER_SYSTEM,[{role:'user',content:summary+'\n\nGenerate a full media buyer briefing.'}],2200)
-      setBriefing(JSON.parse(txt.replace(/```json\n?|```\n?/g,'').trim()))
+      setBriefing(JSON.parse(repairJSON(txt)))
     }catch(err){setError('Analysis failed: '+err.message)}
     clearInterval(msgInterval.current);setLoading(false)
   }
